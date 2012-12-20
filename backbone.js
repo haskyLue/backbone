@@ -70,20 +70,30 @@
   // Implement fancy features of the Events API such as multiple event
   // names `"change blur"` and jQuery-style event maps `{change: action}`
   // in terms of the existing API.
-  var eventsApi = function(obj, action, name, rest) {
-    if (!name) return true;
-    if (typeof name === 'object') {
-      for (var key in name) {
-        obj[action].apply(obj, [key, name[key]].concat(rest));
+  var eventsApi = function(f) {
+    return function(name, callback, context) {
+      var args;
+
+      // Handle event maps.
+      if (name != null && typeof name === 'object') {
+        args = slice.call(arguments, 1);
+        for (var key in name) {
+          f.apply(this, [key, name[key]].concat(args));
+        }
+
+      // Handle space separated event names.
+      } else if (eventSplitter.test(name)) {
+        args = slice.call(arguments, 1);
+        var names = name.split(eventSplitter);
+        for (var i = 0, length = names.length; i < length; i++) {
+          f.apply(this, [names[i]].concat(args));
+        }
+
+      } else {
+        f.apply(this, arguments);
       }
-    } else if (eventSplitter.test(name)) {
-      var names = name.split(eventSplitter);
-      for (var i = 0, l = names.length; i < l; i++) {
-        obj[action].apply(obj, [names[i]].concat(rest));
-      }
-    } else {
-      return true;
-    }
+      return this;
+    };
   };
 
   // Optimized internal dispatch function for triggering events. Tries to
@@ -118,18 +128,17 @@
     // Bind one or more space separated events, or an events map,
     // to a `callback` function. Passing `"all"` will bind the callback to
     // all events fired.
-    on: function(name, callback, context) {
-      if (!(eventsApi(this, 'on', name, [callback, context]) && callback)) return this;
+    on: eventsApi(function(name, callback, context) {
+      if (!callback) return this;
       this._events || (this._events = {});
       var list = this._events[name] || (this._events[name] = []);
       list.push({callback: callback, context: context, ctx: context || this});
       return this;
-    },
+    }),
 
     // Bind events to only be triggered a single time. After the first time
     // the callback is invoked, it will be removed.
-    once: function(name, callback, context) {
-      if (!(eventsApi(this, 'once', name, [callback, context]) && callback)) return this;
+    once: eventsApi(function(name, callback, context) {
       var self = this;
       var once = _.once(function() {
         self.off(name, once);
@@ -138,15 +147,17 @@
       once._callback = callback;
       this.on(name, once, context);
       return this;
-    },
+    }),
 
     // Remove one or many callbacks. If `context` is null, removes all
     // callbacks with that function. If `callback` is null, removes all
     // callbacks for the event. If `events` is null, removes all bound
     // callbacks for all events.
-    off: function(name, callback, context) {
+    off: eventsApi(function(name, callback, context) {
       var list, ev, events, names, i, l, j, k;
-      if (!this._events || !eventsApi(this, 'off', name, [callback, context])) return this;
+
+      if (!this._events) return this;
+
       if (!name && !callback && !context) {
         this._events = {};
         return this;
@@ -171,22 +182,21 @@
       }
 
       return this;
-    },
+    }),
 
     // Trigger one or many events, firing all bound callbacks. Callbacks are
     // passed the same arguments as `trigger` is, apart from the event name
     // (unless you're listening on `"all"`, which will cause your callback to
     // receive the true name of the event as the first argument).
-    trigger: function(name) {
+    trigger: eventsApi(function(name) {
       if (!this._events) return this;
       var args = slice.call(arguments, 1);
-      if (!eventsApi(this, 'trigger', name, args)) return this;
       var events = this._events[name];
       var allEvents = this._events.all;
       if (events) triggerEvents(this, events, args);
       if (allEvents) triggerEvents(this, allEvents, arguments);
       return this;
-    },
+    }),
 
     // An inversion-of-control version of `on`. Tell *this* object to listen to
     // an event in another object ... keeping track of what it's listening to.
