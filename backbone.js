@@ -300,10 +300,7 @@
     // ----------------------------------------------------------------------
 
     // Set a hash of model attributes on the object, firing `"change"` unless
-    // you choose to silence it. To remove a model attribute, pass a value of
-    // `undefined`. For example: to remove an attribute "foo", you would pass
-    // { "foo": undefined }. You can add and remove multiple attributes in
-    // the same hash.
+    // you choose to silence it.
     set: function(key, val, options) {
       var attr, attrs, changes, changing, prev, current;
       if (key == null) return this;
@@ -344,7 +341,7 @@
         } else {
           delete this.changed[attr];
         }
-        (val === void 0) ? delete current[attr] : current[attr] = val;
+        current[attr] = val;
       }
 
       // Trigger all relevant attribute changes.
@@ -361,6 +358,12 @@
       this._pending = false;
       this._changing = false;
       return this;
+    },
+
+    // Set an attribute to undefined, firing a `"change"` event.  `unset` is a
+    // noop if the attribute doesn't exist.
+    unset: function(attr, options) {
+      return this.set(attr, void 0, options);
     },
 
     // Clear all attributes on the model, firing `"change"` unless you choose

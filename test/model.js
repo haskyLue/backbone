@@ -648,11 +648,6 @@ $(document).ready(function() {
     model.set('x', undefined);
   });
 
-  test("unable to set undefined values", 1, function() {
-    var model = new Backbone.Model({x: undefined});
-    ok(!('x' in model.attributes));
-  });
-
   test("hasChanged works outside of change events, and true within", 4, function() {
     var model = new Backbone.Model;
     model.on('change:x', function() {
