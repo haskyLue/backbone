@@ -1069,7 +1069,6 @@
     // the DOM event listeners attached to it, and remove any applicable
     // Backbone.Events listeners.
     remove: function() {
-      this.undelegateEvents();
       this._removeElement();
       this.stopListening();
       return this;
@@ -1107,16 +1106,15 @@
     // This only works for delegate-able events: not `focus`, `blur`, and
     // not `change`, `submit`, and `reset` in Internet Explorer.
     delegateEvents: function(events) {
-      if (!(events || (events = _.result(this, 'events')))) return this;
+      if (!events) events = _.result(this, 'events');
+      if (!events) return this;
       this.undelegateEvents();
       for (var key in events) {
         var method = events[key];
         if (!_.isFunction(method)) method = this[events[key]];
         if (!method) continue;
-
         var match = key.match(delegateEventSplitter);
-        var eventName = match[1], selector = match[2];
-        this.delegate(eventName, selector, _.bind(method, this));
+        this.delegate(match[1], match[2], _.bind(method, this));
       }
       return this;
     },
