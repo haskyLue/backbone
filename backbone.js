@@ -1065,20 +1065,28 @@
       return this;
     },
 
-    // Remove this view by taking the element out of the DOM, and removing any
-    // applicable Backbone.Events listeners.
+    // Remove this view by taking the element out of the document, remove all
+    // the DOM event listeners attached to it, and remove any applicable
+    // Backbone.Events listeners.
     remove: function() {
-      this.$el.remove();
+      this.undelegateEvents();
+      this._removeElement();
       this.stopListening();
       return this;
     },
 
+    // Remove this view's element from the document and remove all the event
+    // listeners attached to it. Useful for subclasses to override in order to
+    // utilize an alternative DOM manipulation API.
+    _removeElement: function() {
+      this.$el.remove();
+    },
+
     // Change the view's element (`this.el` property), including event
-    // re-delegation.
-    setElement: function(element, delegate) {
-      if (this.$el) this.undelegateEvents();
-      this.$el = element instanceof Backbone.$ ? element : Backbone.$(element);
-      this.el = this.$el[0];
+    // re-delegation. Pass along a set of attributes to be applied to the element.
+    setElement: function(element, attributes, delegate) {
+      this.undelegateEvents();
+      this._setEl(element, attributes);
       if (delegate !== false) this.delegateEvents();
       return this;
     },
@@ -1108,23 +1116,42 @@
 
         var match = key.match(delegateEventSplitter);
         var eventName = match[1], selector = match[2];
-        method = _.bind(method, this);
-        eventName += '.delegateEvents' + this.cid;
-        if (selector === '') {
-          this.$el.on(eventName, method);
-        } else {
-          this.$el.on(eventName, selector, method);
-        }
+        this.delegate(eventName, selector, _.bind(method, this));
       }
       return this;
     },
 
-    // Clears all callbacks previously bound to the view with `delegateEvents`.
+    // Add a single event listener to the element responding only to the
+    // optional `selector` or catches all `eventName` events. Subclasses can
+    // override this to utilize an alternative DOM event management API.
+    delegate: function(eventName, selector, listener) {
+      eventName += '.delegateEvents' + this.cid;
+      if (!selector) {
+        this.$el.on(eventName, listener);
+      } else {
+        // When `delegate` is called with two arguments, `selector` is actually
+        // the `listener`
+        this.$el.on(eventName, selector, listener);
+      }
+      return this;
+    },
+
+    // Clears all callbacks previously bound to the view by `delegateEvents`.
     // You usually don't need to use this, but may wish to if you have multiple
     // Backbone views attached to the same DOM element.
     undelegateEvents: function() {
-      this.$el.off('.delegateEvents' + this.cid);
+      if (this.$el) this.$el.off('.delegateEvents' + this.cid);
       return this;
+    },
+
+    // Creates the `this.el` and `this.$el` references for the View using the
+    // given `el` and a hash of `attributes`. `el` can be a CSS selector or an
+    // HTML string, a jQuery context or an element. Subclasses can override
+    // this to utilize an alternative DOM manipulation API.
+    _setEl: function(el, attributes) {
+      this.$el = el instanceof Backbone.$ ? el : Backbone.$(el);
+      if (attributes) this.$el.attr(attributes);
+      this.el = this.$el[0];
     },
 
     // Ensure that the View has a DOM element to render into.
@@ -1136,10 +1163,9 @@
         var attrs = _.extend({}, _.result(this, 'attributes'));
         if (this.id) attrs.id = _.result(this, 'id');
         if (this.className) attrs['class'] = _.result(this, 'className');
-        var $el = Backbone.$('<' + _.result(this, 'tagName') + '>').attr(attrs);
-        this.setElement($el, false);
+        this.setElement(document.createElement(_.result(this, 'tagName')), attrs, false);
       } else {
-        this.setElement(_.result(this, 'el'), false);
+        this.setElement(_.result(this, 'el'), null, false);
       }
     }
 
